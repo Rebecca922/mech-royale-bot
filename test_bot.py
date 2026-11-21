@@ -96,6 +96,7 @@ class DecisionsTests(unittest.TestCase):
     def setUp(self):
         _, self.obs = messages()
         self.bot = copy.copy(self.prototype)
+        self.bot.settings = dict(self.prototype.settings, enable_rl=False)
         self.bot.world = fixture_world()
         self.bot.planner = Planner(self.bot.world)
         self.bot.loot = {}

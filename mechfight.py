@@ -486,7 +486,7 @@ _CONTINUOUS = ("move", "aim", "boost")
 
 
 def log(*args: Any) -> None:
-    """print() to stderr: stdout is the protocol. Your team sees stderr after each match."""
+    """Print diagnostics to stderr; the match host decides whether logs are available."""
     print(*args, file=sys.stderr, flush=True)
 
 
@@ -537,6 +537,12 @@ def run(make_bot: Any) -> None:
             elif kind == "obs":
                 latest = msg
             elif kind == "end":
+                callback = getattr(bot, "on_end", None)
+                if callable(callback):
+                    try:
+                        callback(msg)
+                    except Exception:
+                        log(traceback.format_exc())
                 return
         if latest is None:
             continue

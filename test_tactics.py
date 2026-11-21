@@ -67,7 +67,7 @@ class TacticalTests(unittest.TestCase):
         self.bot.settings = dict(self.prototype.settings)
         # Exercise features even when the submitted configuration disables one
         # for an ablation. Individual switch tests override these explicitly.
-        self.bot.settings.update(enable_tactics=True, enable_memory=True)
+        self.bot.settings.update(enable_tactics=True, enable_memory=True, enable_rl=False)
         self.bot.world = fixture_world()
         self.bot.planner = Planner(self.bot.world)
         self.bot.tracker = EnemyTracker(self.bot.settings, self.bot.config)

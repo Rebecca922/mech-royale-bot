@@ -1,4 +1,4 @@
-# Oval Sentinel v3 — Mech Royale
+# Oval Sentinel v4 RL — Mech Royale
 
 A Python standard-library bot for the Buildathon Mech Royale track. The
 Dockerfile is at the repository root. No package installation, model download,
@@ -45,7 +45,7 @@ python3 check/check.py --map-dir /arena -- docker run --rm -i \
   -v "$PWD/arena:/arena:ro" oval-sentinel
 ```
 
-The image copies `bot.py`, `navigation.py`, `mechfight.py`, `tactics.py`, and `strategy.json`. The arena
+The image copies `bot.py`, `navigation.py`, `mechfight.py`, `tactics.py`, `online_rl.py`, and `strategy.json`. The arena
 is mounted by the game server; the copy here is just for local checks.
 The runtime writes no files. Docker's base image is version-tagged rather than
 digest-pinned, so the exact OS layer bytes are not guaranteed immutable.
@@ -62,7 +62,8 @@ digest-pinned, so the exact OS layer bytes are not guaranteed immutable.
 
 ## Verification and limitations
 
-See `V3_VALIDATION.md` for the current checks and `V3_NOTES.md` for the strategy changes.
+See `V4_VALIDATION.md` for the current checks and `V4_NOTES.md` for the learning design.
+`V3_VALIDATION.md` and `V3_NOTES.md` describe the preceding rule-based candidate.
 `VALIDATION.md` records the original V1 checks.
 No Docker executable or match engine was available there, so neither a Docker
 build nor real game performance has been verified. No leaderboard score is claimed.
@@ -82,8 +83,35 @@ come from the official `mechfight-kit.tar.gz` supplied for the competition.
 developed with OpenAI Codex assistance. No external Python packages are used.
 
 V3 additionally adds `tactics.py`, fixed parameters in `strategy.json`, and
-`test_tactics.py`. This version is not trained and does not update policy weights
-during a match. Both feature switches can be disabled independently; see
+`test_tactics.py`. V4 adds a small online SARSA table in `online_rl.py`. It starts from a human
+prior and updates within one match. No offline game training has been performed;
+learned values reset for each new bot instance. It has no cross-match persistence. Both feature switches can be disabled independently; see
 `V3_NOTES.md` for the controlled comparisons.
 The MIT grant covers this entry's original code; upstream kit assets remain
 subject to the organizer's applicable terms.
+
+
+## V4 learning and experiments
+
+V3 proposes rule-approved engagements. A table-based SARSA controller either
+accepts that proposal or declines pursuit in favor of the existing survival
+controller. It never invents an engagement rejected by V3. Each abstract state
+starts with a slight preference for V3 (not pretrained weights).
+
+The controller uses rank progress and potential differences, with gamma=1 and
+an exact terminal correction. End-of-game updates do not benefit a match that
+has already ended, and no guarantee of improved play or convergence is made.
+
+- `enable_rl=false`: bypass learner; reproduces V3 on the 300 recorded observations.
+- `enable_rl=true, rl_updates=false`: frozen initial values, same exploration settings.
+- `enable_rl=true, rl_updates=true`: within-match updates (default).
+
+Exploration is limited to already-approved, healthy, high-margin engagements.
+The default epsilon is 0.03 per eligible high-level selection, not per raw tick.
+The rule prior is 0.02, step size is 0.2, and decisions normally last 0.8 seconds,
+with earlier boundaries when the abstract context or allowed choices change.
+The Q table has at most 33 abstract states and two entries per state.
+
+For a visibly changing table, run `python3 demo_sarsa.py`. That file uses
+**invented toy feedback**, is not a mech simulator and saves no trained artifact.
+The recorded conformance stream must not be treated as interactive game training.

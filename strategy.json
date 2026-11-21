@@ -6,5 +6,12 @@
   "prediction_cap_s": 1.2,
   "finish_max_s": 3.2,
   "finish_safety_ratio": 1.6,
-  "duel_min_hp": 0.72
+  "duel_min_hp": 0.72,
+  "enable_rl": true,
+  "rl_updates": true,
+  "rl_alpha": 0.2,
+  "rl_epsilon": 0.03,
+  "rl_interval_s": 0.8,
+  "rl_rule_prior": 0.02,
+  "rl_switch_margin": 0.005
 }

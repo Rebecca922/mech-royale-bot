@@ -8,6 +8,7 @@ import time
 import mechfight as mf
 from navigation import World, Planner
 from tactics import EnemyTracker, Tactician, risk_at
+from online_rl import OnlineSarsa
 
 
 def clamp(v, a, b):
@@ -41,7 +42,7 @@ def intercept(origin, target, velocity, speed):
 
 
 class Bot:
-    name = 'Oval Sentinel v3'
+    name = 'Oval Sentinel v4 RL'
 
     def __init__(self, hello):
         self.config = hello['config']
@@ -57,6 +58,8 @@ class Bot:
         self.tracker = EnemyTracker(self.settings, self.config)
         self.tactician = Tactician(self.config, self.settings)
         self.decision = {'mode': 'survive', 'target': None}
+        self.learner = OnlineSarsa(self.settings, hello['seed'], int(self.config['match']['mechs']))
+        self.rl_summary = None
         self.orbit_side = 1 if hello['slot'] % 2 else -1
         self.rng = random.Random(hello['seed'])
         directory = hello['map']['dir']
@@ -533,6 +536,12 @@ class Bot:
                                                   self.decision['target'])
         else:
             self.decision = {'mode': 'survive', 'target': None}
+        if self.settings['enable_rl'] and self.settings['enable_tactics']:
+            choice = self.learner.step(obs, self.decision)
+            if choice == OnlineSarsa.CAUTIOUS:
+                # Only decline active pursuit. Movement, retreat shooting,
+                # pickups, zone checks and aiming remain rule-controlled.
+                self.decision = {'mode': 'survive', 'target': None}
         move, boost, jump = self.movement(obs, threats)
         act.update(move=move, boost=boost, jump=jump)
         self.combat(obs, act, threats)
@@ -548,6 +557,10 @@ class Bot:
                 act['take'] = p['id']
                 act['drop'] = next(i for i, w in enumerate(me['weapons']) if w and w['kind'] == 'mortar')
         return act
+
+    def on_end(self, message):
+        if self.settings['enable_rl'] and self.settings['enable_tactics']:
+            self.rl_summary = self.learner.finish(message['place'])
 
 
 if __name__ == '__main__':
