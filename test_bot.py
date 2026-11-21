@@ -100,6 +100,9 @@ class DecisionsTests(unittest.TestCase):
         self.bot.planner = Planner(self.bot.world)
         self.bot.loot = {}
         self.bot.memory = {}
+        from tactics import EnemyTracker
+        self.bot.tracker = EnemyTracker(self.bot.settings, self.bot.config)
+        self.bot.decision = {'mode': 'survive', 'target': None}
         self.obs['self']['pos'] = [0, 0, 0]
         self.obs['self']['aim'] = [0, -0.025]
         self.obs['self']['vel'] = [0, 0, 0]

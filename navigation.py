@@ -6,6 +6,7 @@ import math
 import os
 import sys
 import time
+from tactics import risk_at
 
 
 def inside(x, y, ring):
@@ -224,7 +225,7 @@ class Planner:
         self.parents = {}
         self.closed = set()
         self.zone = zone
-        self.threats = [m['pos'] for m in threats[:6]]
+        self.threats = threats[:6]
         self.failed = False
         self.path = []
 
@@ -263,7 +264,9 @@ class Planner:
                 x, y = w.point(q)
                 cx, cy, radius = self.zone
                 risk = max(0, math.hypot(x-cx, y-cy)-radius+8)*0.08
-                risk += sum(max(0, 85-math.hypot(x-p[0], y-p[1]))*0.009 for p in self.threats)
+                risk += sum(0.765*risk_at(x, y, m) if '_confidence' in m else
+                            max(0, 85-math.hypot(x-m['pos'][0], y-m['pos'][1]))*0.009
+                            for m in self.threats)
                 ng = g+step*(1+risk)
                 if ng >= self.costs.get(q, float('inf')):
                     continue

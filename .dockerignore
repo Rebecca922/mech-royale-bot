@@ -3,3 +3,5 @@
 !bot.py
 !navigation.py
 !mechfight.py
+!tactics.py
+!strategy.json

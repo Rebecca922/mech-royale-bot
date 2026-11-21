@@ -1,11 +1,13 @@
 """Campus survival bot: cover, zone timing, resource collection and aimed fire."""
 import math
+import json
 import os
 import random
 import time
 
 import mechfight as mf
 from navigation import World, Planner
+from tactics import EnemyTracker, Tactician, risk_at
 
 
 def clamp(v, a, b):
@@ -39,10 +41,23 @@ def intercept(origin, target, velocity, speed):
 
 
 class Bot:
-    name = 'Oval Sentinel v1'
+    name = 'Oval Sentinel v3'
 
     def __init__(self, hello):
         self.config = hello['config']
+        with open(os.path.join(os.path.dirname(__file__), 'strategy.json')) as f:
+            self.settings = json.load(f)
+        for key in ('enable_tactics', 'enable_memory'):
+            if not isinstance(self.settings[key], bool):
+                raise ValueError(f'{key} must be a JSON boolean')
+        for key in ('memory_ttl_s', 'memory_decay_s', 'prediction_cap_s',
+                    'finish_max_s', 'finish_safety_ratio', 'duel_min_hp'):
+            if not isinstance(self.settings[key], (int, float)) or not math.isfinite(self.settings[key]) or self.settings[key] <= 0:
+                raise ValueError(f'{key} must be a positive finite number')
+        self.tracker = EnemyTracker(self.settings, self.config)
+        self.tactician = Tactician(self.config, self.settings)
+        self.decision = {'mode': 'survive', 'target': None}
+        self.orbit_side = 1 if hello['slot'] % 2 else -1
         self.rng = random.Random(hello['seed'])
         directory = hello['map']['dir']
         if not os.path.isfile(os.path.join(directory, 'v2/world.json')):
@@ -161,6 +176,13 @@ class Bot:
             near_danger = False
             for m in threats[:4]:
                 d = distance((x, y), m['pos'])
+                if self.settings['enable_memory'] and m.get('_age', 0) > 0:
+                    # An uncertain old position must not masquerade as a current
+                    # visible attacker. Spread and discount its area cost.
+                    score -= 54.4*risk_at(x, y, m, reach=170)
+                    if risk_at(x, y, m, reach=70) > 0.25:
+                        near_danger = True
+                    continue
                 if d < 220:
                     eye = [m['pos'][0], m['pos'][1], m['pos'][2]+8*(1+0.05*m.get('cubes', 0))]
                     pt = [x, y, self.world.ground[k]+me['stats']['eye_height']]
@@ -190,6 +212,15 @@ class Bot:
         height = stats['height']
         oldgoal = self.goal
         if self.goal is None or t-self.goal_time >= 1.6:
+            self.choose_goal(obs, threats)
+        if self.settings['enable_tactics'] and self.decision['target'] is not None:
+            tactical_goal = self.tactician.goal(obs, self.world, self.decision, self.orbit_side)
+            if tactical_goal is not None:
+                self.goal = tactical_goal
+            elif self.goal[2] == 'engage':
+                self.choose_goal(obs, threats)
+        elif self.goal[2] == 'engage':
+            # Stop following a pursuit goal as soon as its safety checks fail.
             self.choose_goal(obs, threats)
         goal = self.goal[:2]
         self.drop_wait = False
@@ -247,8 +278,17 @@ class Bot:
             for m in danger:
                 old = distance(pos, m['pos'])
                 new = distance((x, y), m['pos'])
+                if self.settings['enable_memory'] and m.get('_age', 0) > 0:
+                    score += 18*(risk_at(*pos[:2], m)-risk_at(x, y, m))
+                    continue
                 safe = 105 if 'lightning' in m.get('weapons', []) else 85
-                score += (new-old)*clamp((safe+50-old)/80, 0, 1)*1.7
+                if self.decision['target'] == m['id'] and self.goal[2] == 'engage':
+                    preferred = self.decision['range']
+                    if self.decision['mode'] == 'finish':
+                        preferred = min(preferred, old)
+                    score += (abs(old-preferred)-abs(new-preferred))*0.4
+                else:
+                    score += (new-old)*clamp((safe+50-old)/80, 0, 1)*1.7
                 if m.get('charging'):
                     bearing = math.atan2(y-m['pos'][1], x-m['pos'][0])
                     if abs(angle(bearing-m['aim'][0])) < 0.10:
@@ -275,12 +315,14 @@ class Bot:
         self.move_angle = a
         self.last_move = math.hypot(*move)
         self.last_pos, self.last_t = list(pos), t
-        nearby = min((distance(pos, m['pos']) for m in threats), default=999)
+        nearby = min((distance(pos, m['pos']) for m in threats if m.get('_confidence', 1) > 0.5), default=999)
         urgent = not me['in_zone'] or distance(pos, obs['zone']['center']) > obs['zone']['radius']-15
         fleeing = nearby < 90 or (t-self.last_damage < 2 and nearby < 180)
         # Hysteresis avoids energy stutter and leaves a reserve for escape.
         was_boosting = getattr(self, 'boosting', False)
         self.boosting = bool(speed and (urgent or fleeing) and me['energy'] > (12 if was_boosting else 42))
+        if self.goal[2] == 'engage' and self.decision['mode'] == 'finish' and self.decision['ttk'] < 1 and not urgent:
+            self.boosting = False
         jump = bool(t < self.escape_until and me['grounded'] and me['energy'] > 35)
         if not me['grounded'] and t < self.escape_until and me['energy'] > 20:
             self.boosting = True
@@ -307,7 +349,8 @@ class Bot:
             hostile = m['kind'] == 'mech'
             if not hostile and (threats or healing or d > 100):
                 continue
-            if hostile and healing and d > 85 and obs['t']-self.last_damage > 2:
+            committed = self.settings['enable_tactics'] and self.decision['target'] == m['id']
+            if hostile and healing and d > 85 and obs['t']-self.last_damage > 2 and not committed:
                 continue
             point = self.target_point(m)
             if not self.world.visible(origin, point):
@@ -317,6 +360,8 @@ class Bot:
                     continue
             score = (110 if hostile else 5)-d*0.32
             score += max(0, 450-m.get('hp', 1400))*0.08
+            if committed:
+                score += 100
             if hostile and d < 55:
                 score += 30
             targets.append((score, m, point))
@@ -359,7 +404,8 @@ class Bot:
             if w.get('charge', 0) > 0 or (w['cooldown'] <= 0.05 and dist < w['stats']['range'] and
                     (not act['boost'] or target.get('hp', 1400) < 300)):
                 mode, chosen = 'laser', laser
-        if mode == 'gun' and mortar is not None and 30 < dist < 180 and weapons[mortar]['cooldown'] <= 0.05:
+        committed = self.settings['enable_tactics'] and self.decision['target'] == target['id']
+        if mode == 'gun' and not committed and mortar is not None and 30 < dist < 180 and weapons[mortar]['cooldown'] <= 0.05:
             mode, chosen = 'mortar', mortar
         if lightning is not None and dist < weapons[lightning]['stats']['range'] and mode != 'laser':
             mode, chosen = 'lightning', lightning
@@ -434,7 +480,7 @@ class Bot:
                 previous = arc
             act['fire'][chosen] = bool(clear and yaw_error < 0.035 and pitch_error < 0.035 and dist > 25)
         # Gun and lightning can share a direct aim; mortar trajectories cannot.
-        if mode == 'laser' and primary is not None:
+        if (mode == 'laser' or (mode == 'lightning' and self.settings['enable_tactics'])) and primary is not None:
             gw = weapons[primary]
             lead = intercept([pos[0], pos[1], pos[2]+stats['muzzle_height']], point, velocity, gw['stats']['speed'])
             gy = math.atan2(lead[1]-pos[1], lead[0]-pos[0])
@@ -461,10 +507,13 @@ class Bot:
                     item, _, kind = self.loot[key]
                     if kind == 'cube' and distance(item['pos'], me['pos']) < 5:
                         del self.loot[key]
-        for m in obs['mechs']:
-            if m['kind'] == 'mech':
-                self.memory[m['id']] = (m, t)
-        threats = [m for m, when in self.memory.values() if t-when < 7]
+        if self.settings['enable_memory']:
+            threats = self.tracker.update(obs)
+        else:
+            for m in obs['mechs']:
+                if m['kind'] == 'mech':
+                    self.memory[m['id']] = (m, t)
+            threats = [m for m, when in self.memory.values() if t-when < 7]
         threats.sort(key=lambda m: distance(m['pos'], me['pos']))
         for key, (_, when) in list(self.memory.items()):
             if t-when > 10:
@@ -479,6 +528,11 @@ class Bot:
         act = {'tick': obs['tick']}
         if obs['offer']:
             act['pick'] = self.pick_upgrade(obs['offer'], me)
+        if self.settings['enable_tactics']:
+            self.decision = self.tactician.choose(obs, self.world, threats, self.future_zone(obs),
+                                                  self.decision['target'])
+        else:
+            self.decision = {'mode': 'survive', 'target': None}
         move, boost, jump = self.movement(obs, threats)
         act.update(move=move, boost=boost, jump=jump)
         self.combat(obs, act, threats)

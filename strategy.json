@@ -1,0 +1,10 @@
+{
+  "enable_tactics": true,
+  "enable_memory": true,
+  "memory_ttl_s": 8.0,
+  "memory_decay_s": 2.5,
+  "prediction_cap_s": 1.2,
+  "finish_max_s": 3.2,
+  "finish_safety_ratio": 1.6,
+  "duel_min_hp": 0.72
+}

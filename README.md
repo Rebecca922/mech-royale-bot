@@ -1,4 +1,4 @@
-# Oval Sentinel — Mech Royale
+# Oval Sentinel v3 — Mech Royale
 
 A Python standard-library bot for the Buildathon Mech Royale track. The
 Dockerfile is at the repository root. No package installation, model download,
@@ -45,7 +45,7 @@ python3 check/check.py --map-dir /arena -- docker run --rm -i \
   -v "$PWD/arena:/arena:ro" oval-sentinel
 ```
 
-The image copies only `bot.py`, `navigation.py`, and `mechfight.py`. The arena
+The image copies `bot.py`, `navigation.py`, `mechfight.py`, `tactics.py`, and `strategy.json`. The arena
 is mounted by the game server; the copy here is just for local checks.
 The runtime writes no files. Docker's base image is version-tagged rather than
 digest-pinned, so the exact OS layer bytes are not guaranteed immutable.
@@ -62,7 +62,8 @@ digest-pinned, so the exact OS layer bytes are not guaranteed immutable.
 
 ## Verification and limitations
 
-See `VALIDATION.md` for checks performed in the development environment.
+See `V3_VALIDATION.md` for the current checks and `V3_NOTES.md` for the strategy changes.
+`VALIDATION.md` records the original V1 checks.
 No Docker executable or match engine was available there, so neither a Docker
 build nor real game performance has been verified. No leaderboard score is claimed.
 
@@ -79,5 +80,10 @@ mount is required for useful play.
 come from the official `mechfight-kit.tar.gz` supplied for the competition.
 `bot.py`, `navigation.py`, and `test_bot.py` are new for this entry and were
 developed with OpenAI Codex assistance. No external Python packages are used.
+
+V3 additionally adds `tactics.py`, fixed parameters in `strategy.json`, and
+`test_tactics.py`. This version is not trained and does not update policy weights
+during a match. Both feature switches can be disabled independently; see
+`V3_NOTES.md` for the controlled comparisons.
 The MIT grant covers this entry's original code; upstream kit assets remain
 subject to the organizer's applicable terms.
