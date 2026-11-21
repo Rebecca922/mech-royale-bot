@@ -9,6 +9,7 @@ import mechfight as mf
 from navigation import World, Planner
 from tactics import EnemyTracker, Tactician, risk_at
 from online_rl import OnlineSarsa
+from damage_model import DamageCalibrator
 
 
 def clamp(v, a, b):
@@ -42,7 +43,7 @@ def intercept(origin, target, velocity, speed):
 
 
 class Bot:
-    name = 'Oval Sentinel v4 RL'
+    name = 'Oval Sentinel v5 SL'
 
     def __init__(self, hello):
         self.config = hello['config']
@@ -57,6 +58,10 @@ class Bot:
                 raise ValueError(f'{key} must be a positive finite number')
         self.tracker = EnemyTracker(self.settings, self.config)
         self.tactician = Tactician(self.config, self.settings)
+        self.damage_model = DamageCalibrator(self.settings, int(self.config['match']['mechs']))
+        if self.settings['enable_sl']:
+            self.tactician.damage_model = self.damage_model
+        self.sl_summary = None
         self.decision = {'mode': 'survive', 'target': None}
         self.learner = OnlineSarsa(self.settings, hello['seed'], int(self.config['match']['mechs']))
         self.rl_summary = None
@@ -559,6 +564,8 @@ class Bot:
         return act
 
     def on_end(self, message):
+        if self.settings['enable_sl']:
+            self.sl_summary = self.damage_model.finish()
         if self.settings['enable_rl'] and self.settings['enable_tactics']:
             self.rl_summary = self.learner.finish(message['place'])
 

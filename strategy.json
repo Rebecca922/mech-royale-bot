@@ -13,5 +13,12 @@
   "rl_epsilon": 0.03,
   "rl_interval_s": 0.8,
   "rl_rule_prior": 0.02,
-  "rl_switch_margin": 0.005
+  "rl_switch_margin": 0.005,
+  "enable_sl": true,
+  "sl_window_s": 1.0,
+  "sl_min_samples": 5,
+  "sl_prior_strength": 4.0,
+  "sl_factor_min": 0.8,
+  "sl_factor_max": 1.5,
+  "sl_min_base_dps": 10.0
 }

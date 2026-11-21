@@ -6,3 +6,4 @@
 !tactics.py
 !strategy.json
 !online_rl.py
+!damage_model.py

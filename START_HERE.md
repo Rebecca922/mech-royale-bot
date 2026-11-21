@@ -1,16 +1,14 @@
-# V4 RL：在现有 V3 仓库上更新
+# V5：监督学习校准实验
 
-这是单局在线强化学习实验，不是已经经过大量对局预训练的模型。
-V1 用户报告分数 1.73，V3 用户报告 1.85；V4 还没有实战成绩。
+以用户报告 2.00 的 V4-F 为直接对照，继续冻结 RL 更新，增加伤害预测校准。
+用户报告 2.06 的 V4 提交仍是当前最高候选，请保留。
 
-1. 下载 `mech-royale-v4-rl-update.zip` 到 Downloads，不要解压到仓库。
-2. 进入原来的 `mech-royale-v1` Git 仓库目录，确认没有未提交改动。
-3. 将更新包解压到临时目录，从原仓库运行其中的 `apply_update.py`。
-4. 运行 `python3 -B -m unittest discover -s . -v`，预期 48 项测试通过。
-5. 运行 `python3 demo_sarsa.py`，观察教学例子中的价值变化。这不是真实游戏训练。
-6. 运行 `python3 check/check.py -- python3 -B -u bot.py`，预期 PASS。
-7. git add、commit、push 后，在比赛页面使用原仓库地址提交新的完整 SHA。
+下载 mech-royale-v5-sl-update.zip 到 Downloads，不要解压到原仓库。
+从现有仓库运行更新包里的 apply_update.py，再运行全部测试和官方检查，
+最后 commit、push、在比赛页面用原仓库地址提交新 SHA。
+完整命令在更新包外层 UPDATE_INSTRUCTIONS.md。
 
-不需要创建新 GitHub 仓库，不需要在本机训练大型模型。
-每局 Q 表重新初始化，不会在连续提交或多局评分之间自动积累经验。
-详细公式、选择范围、奖励和局限见 `V4_NOTES.md`。
+监督学习的数据来自本局后续实际受伤记录，不是手工编造的游戏标签。
+只有人造教学演示 demo_supervised.py 使用人为标签，不保存模型，也不是游戏模拟器。
+无大型模型、无额外依赖、无跨局训练积累，不能保证提分。
+详细公式和局限见 V5_NOTES.md。
