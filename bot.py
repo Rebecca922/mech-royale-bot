@@ -9,7 +9,6 @@ import mechfight as mf
 from navigation import World, Planner
 from tactics import EnemyTracker, Tactician, risk_at
 from online_rl import OnlineSarsa
-from damage_model import DamageCalibrator
 
 
 def clamp(v, a, b):
@@ -43,7 +42,7 @@ def intercept(origin, target, velocity, speed):
 
 
 class Bot:
-    name = 'Oval Sentinel v5 SL'
+    name = 'Oval Sentinel v4 RL'
 
     def __init__(self, hello):
         self.config = hello['config']
@@ -58,10 +57,6 @@ class Bot:
                 raise ValueError(f'{key} must be a positive finite number')
         self.tracker = EnemyTracker(self.settings, self.config)
         self.tactician = Tactician(self.config, self.settings)
-        self.damage_model = DamageCalibrator(self.settings, int(self.config['match']['mechs']))
-        if self.settings['enable_sl']:
-            self.tactician.damage_model = self.damage_model
-        self.sl_summary = None
         self.decision = {'mode': 'survive', 'target': None}
         self.learner = OnlineSarsa(self.settings, hello['seed'], int(self.config['match']['mechs']))
         self.rl_summary = None
@@ -346,6 +341,16 @@ class Bot:
             h = self.config['mech']['height']*(1+self.config['cubes'].get('size_per_cube', 0.05)*m.get('cubes', 0))/2
         return [p[0], p[1], p[2]+h]
 
+    def magazine_can_finish(self, me, target, gun):
+        """Known-damage estimate only; enemy armor and missed shots are unknown."""
+        if target.get('kind') != 'mech' or gun.get('reload', 0) > 0:
+            return False
+        ammo = int(gun.get('ammo', 0))
+        cubes = self.config['cubes']
+        multiplier = 1+cubes['damage_per_cube']*min(me.get('cubes', 0), cubes['stat_cap'])
+        damage = gun['stats']['damage']*multiplier
+        return ammo > 0 and damage > 0 and ammo*damage >= target.get('hp', float('inf'))
+
     def combat(self, obs, act, threats):
         me = obs['self']
         pos, stats = me['pos'], me['stats']
@@ -502,7 +507,9 @@ class Bot:
                 act['fire'][lightning] = True
         if primary is not None:
             gun = weapons[primary]
-            if gun.get('ammo', 0) == 0 or (gun.get('ammo', 0) < 4 and dist > 145):
+            preserve_finisher = (committed and self.decision.get('mode') == 'finish' and
+                                  self.magazine_can_finish(me, target, gun))
+            if gun.get('ammo', 0) == 0 or (gun.get('ammo', 0) < 4 and dist > 145 and not preserve_finisher):
                 act['reload'] = True
 
     def act(self, obs):
@@ -564,8 +571,6 @@ class Bot:
         return act
 
     def on_end(self, message):
-        if self.settings['enable_sl']:
-            self.sl_summary = self.damage_model.finish()
         if self.settings['enable_rl'] and self.settings['enable_tactics']:
             self.rl_summary = self.learner.finish(message['place'])
 

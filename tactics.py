@@ -57,7 +57,6 @@ class Tactician:
     def __init__(self, config, settings):
         self.config = config
         self.settings = settings
-        self.damage_model = None
 
     def cube_multiplier(self, cubes):
         c = self.config['cubes']
@@ -138,18 +137,13 @@ class Tactician:
     def choose(self, obs, world, tracks, future_zone, previous_target=None):
         me = obs['self']
         default = {'mode': 'survive', 'target': None, 'ttk': None, 'danger_s': None}
-        calibrated = None
-        if self.damage_model is not None:
-            raw_damage, attackers = self.incoming(obs, world, tracks)
-            self.damage_model.observe(obs, raw_damage)
-            calibrated = self.damage_model.predict(raw_damage), attackers
         if not me['in_zone']:
             return default
         cx, cy, radius = future_zone
         # Never initiate a chase into the imminent zone edge.
         if radius-distance(me['pos'], (cx, cy)) < min(12, radius*0.15):
             return default
-        damage, attackers = calibrated if calibrated is not None else self.incoming(obs, world, tracks)
+        damage, attackers = self.incoming(obs, world, tracks)
         danger_time = me['hp']/max(1, damage)
         default['danger_s'] = danger_time
         origin = [*me['pos'][:2], me['pos'][2]+me['stats']['muzzle_height']]

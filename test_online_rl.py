@@ -21,7 +21,7 @@ class SarsaTests(unittest.TestCase):
     def setUp(self):
         with open(ROOT/'strategy.json') as f:
             self.settings = json.load(f)
-        self.settings.update(rl_epsilon=0, rl_updates=True)
+        self.settings['rl_epsilon'] = 0
         _, self.obs = messages()
         self.obs.update(t=0, alive=16, mechs=[])
         self.proposal = {'target': 7, 'mode': 'engage', 'ttk': 2, 'danger_s': 20, 'range': 100}
@@ -161,7 +161,7 @@ class IntegrationTests(unittest.TestCase):
     def setUp(self):
         _, self.obs = messages()
         self.bot = copy.copy(self.prototype)
-        self.bot.settings = dict(self.prototype.settings, rl_epsilon=0, rl_updates=True)
+        self.bot.settings = dict(self.prototype.settings, rl_epsilon=0)
         self.bot.world = fixture_world()
         self.bot.planner = Planner(self.bot.world)
         self.bot.tracker = EnemyTracker(self.bot.settings, self.bot.config)
@@ -201,23 +201,6 @@ class IntegrationTests(unittest.TestCase):
         self.bot.on_end({'type': 'end', 'place': 14, 'kills': 0})
         self.assertEqual(self.bot.learner.q, {})
         self.assertIsNone(self.bot.rl_summary)
-
-    def test_published_configuration_honors_update_switch(self):
-        with open(ROOT/'strategy.json') as f:
-            published = json.load(f)
-        self.bot.settings['rl_updates'] = published['rl_updates']
-        self.bot.act(self.obs)
-        self.obs.update(t=1, tick=20)
-        self.obs['self']['hp'] -= 100
-        self.bot.act(self.obs)
-        self.bot.on_end({'type': 'end', 'place': 14, 'kills': 0})
-        if published['rl_updates']:
-            self.assertGreater(self.bot.learner.updates, 0)
-        else:
-            self.assertEqual(self.bot.learner.updates, 0)
-            for state, values in self.bot.learner.q.items():
-                expected = 0 if state[0] == -1 else published['rl_rule_prior']
-                self.assertEqual(values, [expected, 0.0])
 
     def test_rule_safety_rejection_cannot_be_overridden(self):
         self.obs['self']['in_zone'] = False

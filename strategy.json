@@ -8,17 +8,10 @@
   "finish_safety_ratio": 1.6,
   "duel_min_hp": 0.72,
   "enable_rl": true,
-  "rl_updates": false,
+  "rl_updates": true,
   "rl_alpha": 0.2,
   "rl_epsilon": 0.03,
   "rl_interval_s": 0.8,
   "rl_rule_prior": 0.02,
-  "rl_switch_margin": 0.005,
-  "enable_sl": true,
-  "sl_window_s": 1.0,
-  "sl_min_samples": 5,
-  "sl_prior_strength": 4.0,
-  "sl_factor_min": 0.8,
-  "sl_factor_max": 1.5,
-  "sl_min_base_dps": 10.0
+  "rl_switch_margin": 0.005
 }
