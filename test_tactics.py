@@ -3,7 +3,7 @@ import copy
 import math
 import unittest
 
-from bot import Bot
+from bot import LegacyBot as Bot
 from navigation import Planner
 from tactics import EnemyTracker, Tactician, risk_at
 from test_bot import ROOT, fixture_world, messages

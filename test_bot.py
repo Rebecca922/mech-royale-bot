@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from bot import Bot, intercept
+from bot import LegacyBot as Bot, intercept
 from navigation import World, Planner
 
 ROOT = Path(__file__).resolve().parent

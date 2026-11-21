@@ -10,7 +10,7 @@ import subprocess
 import sys
 import unittest
 
-from bot import Bot
+from bot import LegacyBot as Bot
 from navigation import Planner
 from online_rl import OnlineSarsa
 from tactics import EnemyTracker, Tactician
@@ -21,6 +21,7 @@ class SarsaTests(unittest.TestCase):
     def setUp(self):
         with open(ROOT/'strategy.json') as f:
             self.settings = json.load(f)
+        self.settings.update(enable_rl=True, rl_updates=True)
         self.settings['rl_epsilon'] = 0
         _, self.obs = messages()
         self.obs.update(t=0, alive=16, mechs=[])
@@ -161,7 +162,7 @@ class IntegrationTests(unittest.TestCase):
     def setUp(self):
         _, self.obs = messages()
         self.bot = copy.copy(self.prototype)
-        self.bot.settings = dict(self.prototype.settings, rl_epsilon=0)
+        self.bot.settings = dict(self.prototype.settings, rl_epsilon=0, enable_rl=True, rl_updates=True)
         self.bot.world = fixture_world()
         self.bot.planner = Planner(self.bot.world)
         self.bot.tracker = EnemyTracker(self.bot.settings, self.bot.config)

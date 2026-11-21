@@ -41,7 +41,7 @@ def intercept(origin, target, velocity, speed):
     return [target[i]+velocity[i]*clamp(t, 0, 2.5) for i in range(3)]
 
 
-class Bot:
+class LegacyBot:
     name = 'Oval Sentinel v4 RL'
 
     def __init__(self, hello):
@@ -341,16 +341,6 @@ class Bot:
             h = self.config['mech']['height']*(1+self.config['cubes'].get('size_per_cube', 0.05)*m.get('cubes', 0))/2
         return [p[0], p[1], p[2]+h]
 
-    def magazine_can_finish(self, me, target, gun):
-        """Known-damage estimate only; enemy armor and missed shots are unknown."""
-        if target.get('kind') != 'mech' or gun.get('reload', 0) > 0:
-            return False
-        ammo = int(gun.get('ammo', 0))
-        cubes = self.config['cubes']
-        multiplier = 1+cubes['damage_per_cube']*min(me.get('cubes', 0), cubes['stat_cap'])
-        damage = gun['stats']['damage']*multiplier
-        return ammo > 0 and damage > 0 and ammo*damage >= target.get('hp', float('inf'))
-
     def combat(self, obs, act, threats):
         me = obs['self']
         pos, stats = me['pos'], me['stats']
@@ -507,9 +497,7 @@ class Bot:
                 act['fire'][lightning] = True
         if primary is not None:
             gun = weapons[primary]
-            preserve_finisher = (committed and self.decision.get('mode') == 'finish' and
-                                  self.magazine_can_finish(me, target, gun))
-            if gun.get('ammo', 0) == 0 or (gun.get('ammo', 0) < 4 and dist > 145 and not preserve_finisher):
+            if gun.get('ammo', 0) == 0 or (gun.get('ammo', 0) < 4 and dist > 145):
                 act['reload'] = True
 
     def act(self, obs):
@@ -573,6 +561,13 @@ class Bot:
     def on_end(self, message):
         if self.settings['enable_rl'] and self.settings['enable_tactics']:
             self.rl_summary = self.learner.finish(message['place'])
+
+
+from controller import ControllerMixin
+
+
+class Bot(ControllerMixin, LegacyBot):
+    name = 'Oval Sentinel v7 Hunter'
 
 
 if __name__ == '__main__':
